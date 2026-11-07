@@ -1,14 +1,21 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || 10000;
 const apiKey = process.env.RENDERFUL_API_KEY;
 const renderfulBase = 'https://api.renderful.ai/api/v1';
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+// Serve the Vite-built web app from the same Render service.
+const webDist = path.resolve(__dirname, '../dist');
+app.use(express.static(webDist));
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -95,6 +102,10 @@ app.get('/api/status/:id', async (req, res) => {
     console.error('Status error:', error);
     res.status(500).json({ error: error.message || 'Could not check video status.' });
   }
+});
+
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(webDist, 'index.html'));
 });
 
 app.use((error, _req, res, _next) => {
