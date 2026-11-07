@@ -1,0 +1,6 @@
+{
+  "appId": "com.rexai.video",
+  "appName": "REX AI VIDEO",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
