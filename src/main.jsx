@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Video, ImagePlus, WandSparkles, Download, Mic, Clapperboard } from 'lucide-react';
 import './style.css';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://rex-ai-video-api.onrender.com').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 function App() {
   const [mode, setMode] = useState('text');
