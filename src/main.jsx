@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Capacitor } from '@capacitor/core';
 import { Video, ImagePlus, WandSparkles, Download, Mic, Clapperboard } from 'lucide-react';
 import './style.css';
+
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://rex-ai-video-api.onrender.com').replace(/\/$/, '');
 
 function App() {
   const [mode, setMode] = useState('text');
@@ -17,24 +18,39 @@ function App() {
   const generate = async () => {
     if (!prompt.trim()) return setMessage('Please enter a video description.');
     if (mode === 'image' && !image) return setMessage('Please choose an image first.');
-    const endpoint = import.meta.env.VITE_VIDEO_API_URL;
-    if (!endpoint) return setMessage('Video generation is not connected yet. Add VITE_VIDEO_API_URL in your deployment secrets and connect a compatible AI video API.');
     setBusy(true);
-    setMessage('Sending your request…');
     setVideoUrl('');
     try {
+      setMessage('Waking up the video server…');
       const body = new FormData();
       body.append('prompt', prompt);
       body.append('quality', quality);
       body.append('voice', String(voice));
       body.append('mode', mode);
-      if (image) body.append('image', image);
-      const response = await fetch(endpoint, { method: 'POST', body });
-      if (!response.ok) throw new Error(await response.text() || 'Generation request failed');
-      const data = await response.json();
-      if (!data.videoUrl) throw new Error('The API response did not include videoUrl.');
-      setVideoUrl(data.videoUrl);
-      setMessage('Your video is ready!');
+      if (mode === 'image' && image) body.append('image', image);
+
+      const response = await fetch(`${API_BASE}/api/generate`, { method: 'POST', body });
+      const started = await response.json();
+      if (!response.ok) throw new Error(started.error || 'Could not start generation.');
+      if (!started.taskId) throw new Error('The provider did not return a task ID.');
+
+      setMessage('Your video is generating. This can take a few minutes…');
+      const deadline = Date.now() + 5 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const statusResponse = await fetch(`${API_BASE}/api/status/${encodeURIComponent(started.taskId)}`);
+        const status = await statusResponse.json();
+        if (!statusResponse.ok) throw new Error(status.error || 'Could not check generation status.');
+        if (status.status === 'completed') {
+          if (!status.videoUrl) throw new Error('Generation completed, but no video URL was returned.');
+          setVideoUrl(status.videoUrl);
+          setMessage('Your video is ready!');
+          return;
+        }
+        if (status.status === 'failed') throw new Error(status.error || 'The video provider could not generate this video.');
+        setMessage(status.status === 'queued' ? 'Your video is in the queue…' : 'Your video is being created…');
+      }
+      throw new Error('This video is taking longer than expected. Please try checking again in a moment.');
     } catch (error) {
       setMessage(error.message || 'Something went wrong.');
     } finally {
@@ -46,11 +62,12 @@ function App() {
     if (!videoUrl) return;
     try {
       const response = await fetch(videoUrl);
+      if (!response.ok) throw new Error('Download failed');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'rex-ai-video.mp4'; a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       window.open(videoUrl, '_blank');
     }
@@ -73,7 +90,7 @@ function App() {
         <label className="voice-toggle"><span><Mic size={17}/> AI voice</span><input type="checkbox" checked={voice} onChange={e => setVoice(e.target.checked)}/></label>
       </div>
       <button className="generate" onClick={generate} disabled={busy}><WandSparkles size={18}/>{busy ? 'Working…' : 'Generate video'}</button>
-      <p className="note">Generation requires a connected AI video service. Quality and voice availability depend on that provider.</p>
+      <p className="note">Video generation is powered by Renderful. Actual resolution and voice support depend on the selected model.</p>
     </section>
     <section className="result">
       <div className="section-title"><Video size={18}/><h2>Your video</h2></div>
