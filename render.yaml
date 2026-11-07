@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: rex-ai-video-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: RENDERFUL_API_KEY
+        sync: false
